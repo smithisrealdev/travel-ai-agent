@@ -1,21 +1,24 @@
+version: '3.9'
+
 services:
   # PostgreSQL Database
   postgres:
-    image: postgres:15-alpine
+    image: postgres:15
     container_name: travel-ai-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-travelagent}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your_secure_password_here}
-      POSTGRES_DB: ${POSTGRES_DB:-travelagent}
+      POSTGRES_DB: ${POSTGRES_DB:-traveldb}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - travel-network
+      - travel_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-travelagent}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -30,14 +33,15 @@ services:
     volumes:
       - redis_data:/data
     networks:
-      - travel-network
+      - travel_net
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
+    command: redis-server --appendonly yes
 
-  # Backend Service (Go + Fiber)
+  # Backend API (Go/Fiber)
   backend:
     build:
       context: ./backend
@@ -46,42 +50,41 @@ services:
     restart: unless-stopped
     ports:
       - "8080:8080"
+    env_file:
+      - .env
     environment:
-      BACKEND_PORT: ${BACKEND_PORT:-8080}
-      BACKEND_HOST: ${BACKEND_HOST:-0.0.0.0}
+      # Database Configuration
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_USER: ${POSTGRES_USER:-travelagent}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your_secure_password_here}
-      POSTGRES_DB: ${POSTGRES_DB:-travelagent}
-      DATABASE_URL: ${DATABASE_URL}
+      POSTGRES_DB: ${POSTGRES_DB:-traveldb}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      
+      # Redis Configuration
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_URL: ${REDIS_URL}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4-turbo-preview}
+      
+      # API Keys (from .env)
       WEATHER_API_KEY: ${WEATHER_API_KEY}
-      WEATHER_API_URL: ${WEATHER_API_URL}
       FLIGHT_API_KEY: ${FLIGHT_API_KEY}
-      FLIGHT_API_URL: ${FLIGHT_API_URL}
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
-      ENVIRONMENT: ${ENVIRONMENT:-development}
-      DEBUG: ${DEBUG:-true}
+      HOTEL_API_KEY: ${HOTEL_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      
+      # Server Configuration
+      PORT: 8080
+      ENV: ${ENV:-development}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     networks:
-      - travel-network
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - travel_net
+    volumes:
+      - ./backend:/app
+      - /app/tmp
 
-  # Frontend Service (Nuxt 3)
+  # Frontend (Nuxt.js/Vue)
   frontend:
     build:
       context: ./frontend
@@ -91,20 +94,30 @@ services:
     ports:
       - "3000:3000"
     environment:
-      NUXT_PUBLIC_API_BASE: http://backend:8080
-      NODE_ENV: ${ENVIRONMENT:-development}
+      # Backend API URL
+      NUXT_PUBLIC_API_BASE_URL: ${NUXT_PUBLIC_API_BASE_URL:-http://backend:8080}
+      BACKEND_URL: http://backend:8080
+      
+      # Nuxt Configuration
+      NODE_ENV: ${NODE_ENV:-development}
+      HOST: 0.0.0.0
+      PORT: 3000
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     networks:
-      - travel-network
+      - travel_net
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.nuxt
+
+networks:
+  travel_net:
+    driver: bridge
+    name: travel_net
 
 volumes:
   postgres_data:
     driver: local
   redis_data:
     driver: local
-
-networks:
-  travel-network:
-    driver: bridge
