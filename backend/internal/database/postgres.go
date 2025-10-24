@@ -18,7 +18,7 @@ type PostgresDB struct {
 // NewPostgresDB creates a new PostgreSQL connection
 func NewPostgresDB(cfg *config.Config) (*PostgresDB, error) {
 	var connStr string
-	
+
 	// Use DATABASE_URL if available, otherwise build from components
 	if cfg.Database.URL != "" {
 		connStr = cfg.Database.URL

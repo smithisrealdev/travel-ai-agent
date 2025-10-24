@@ -93,9 +93,9 @@ func (s *FlightService) SearchFlights(origin, destination, date string) ([]model
 	for _, flight := range flightResp.Data {
 		departTime, _ := time.Parse(time.RFC3339, flight.Departure.Scheduled)
 		arriveTime, _ := time.Parse(time.RFC3339, flight.Arrival.Scheduled)
-		
+
 		duration := arriveTime.Sub(departTime)
-		
+
 		flightInfo := models.FlightInfo{
 			FlightNumber: flight.FlightNumber,
 			Airline:      flight.Airline.Name,
@@ -107,7 +107,7 @@ func (s *FlightService) SearchFlights(origin, destination, date string) ([]model
 			Price:        0, // Price not provided by basic API
 			Stops:        0, // Direct flights only in this basic implementation
 		}
-		
+
 		flights = append(flights, flightInfo)
 	}
 
@@ -152,7 +152,7 @@ func (s *FlightService) GetFlightStatus(flightNumber string) (*models.FlightInfo
 	flight := flightResp.Data[0]
 	departTime, _ := time.Parse(time.RFC3339, flight.Departure.Scheduled)
 	arriveTime, _ := time.Parse(time.RFC3339, flight.Arrival.Scheduled)
-	
+
 	duration := arriveTime.Sub(departTime)
 
 	flightInfo := &models.FlightInfo{

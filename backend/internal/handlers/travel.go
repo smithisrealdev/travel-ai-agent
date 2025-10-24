@@ -14,11 +14,11 @@ import (
 
 // TravelHandler handles travel-related HTTP requests
 type TravelHandler struct {
-	db            *database.PostgresDB
-	redis         *database.RedisCache
-	openai        *services.OpenAIService
-	weather       *services.WeatherService
-	flight        *services.FlightService
+	db      *database.PostgresDB
+	redis   *database.RedisCache
+	openai  *services.OpenAIService
+	weather *services.WeatherService
+	flight  *services.FlightService
 }
 
 // NewTravelHandler creates a new travel handler instance
@@ -172,7 +172,7 @@ func (h *TravelHandler) GetSearchHistory(c *fiber.Ctx) error {
 	for rows.Next() {
 		var search models.TravelSearch
 		var preferencesJSON, resultsJSON []byte
-		
+
 		err := rows.Scan(
 			&search.ID,
 			&search.UserID,
@@ -267,7 +267,7 @@ func (h *TravelHandler) HealthCheck(c *fiber.Ctx) error {
 // storeSearch stores a travel search in the database
 func (h *TravelHandler) storeSearch(req *models.TravelSearchRequest, results string) (int, error) {
 	var searchID int
-	
+
 	preferencesJSON, _ := json.Marshal(req.Preferences)
 	resultsMap := map[string]interface{}{
 		"recommendations": results,

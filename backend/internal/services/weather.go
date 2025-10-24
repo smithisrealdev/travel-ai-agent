@@ -148,7 +148,7 @@ func (s *WeatherService) GetForecast(destination string, days int) ([]models.Day
 	forecastMap := make(map[string]*models.DayForecast)
 	for _, item := range forecastResp.List {
 		date := time.Unix(item.Dt, 0).Format("2006-01-02")
-		
+
 		if _, exists := forecastMap[date]; !exists {
 			forecast := &models.DayForecast{
 				Date:    date,

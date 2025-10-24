@@ -41,6 +41,7 @@ func main() {
 	openaiService := services.NewOpenAIService(cfg)
 	weatherService := services.NewWeatherService(cfg)
 	flightService := services.NewFlightService(cfg)
+	planService := services.NewPlanService(cfg)
 
 	// Initialize handlers
 	travelHandler := handlers.NewTravelHandler(
@@ -50,6 +51,7 @@ func main() {
 		weatherService,
 		flightService,
 	)
+	planHandler := handlers.NewPlanHandler(planService)
 
 	// Create Fiber app
 	app := fiber.New(fiber.Config{
@@ -71,11 +73,17 @@ func main() {
 	}))
 
 	// API Routes
-	api := app.Group("/api/v1")
+	api := app.Group("/api")
+
+	// Plan endpoint
+	api.Post("/plan", planHandler.CreateTravelPlan)
+
+	// API v1 Routes
+	apiv1 := app.Group("/api/v1")
 
 	// Travel endpoints
-	api.Post("/travel/search", travelHandler.SearchTravel)
-	api.Get("/travel/history", travelHandler.GetSearchHistory)
+	apiv1.Post("/travel/search", travelHandler.SearchTravel)
+	apiv1.Get("/travel/history", travelHandler.GetSearchHistory)
 
 	// Health check endpoint
 	app.Get("/health", travelHandler.HealthCheck)
@@ -102,7 +110,7 @@ func main() {
 	// Start server
 	address := fmt.Sprintf("%s:%s", cfg.Backend.Host, cfg.Backend.Port)
 	log.Printf("Starting server on %s", address)
-	
+
 	if err := app.Listen(address); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
