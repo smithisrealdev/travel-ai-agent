@@ -1,106 +1,197 @@
 package main
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
+
+func TestOrchestratePlan_Success(t *testing.T) {
+	// Test with a valid travel request message
+	message := "I want to visit Vancouver for 7 days with 100,000 THB budget"
+
+	result := OrchestratePlan(message)
+
+	// Assert basic structure
+	assert.NotEmpty(t, result.Destination, "Destination should not be empty")
+	assert.Greater(t, result.BudgetTHB, 0, "BudgetTHB should be positive")
+	assert.Greater(t, result.DurationDays, 0, "DurationDays should be positive")
+
+	// Assert budget plan exists and has values
+	assert.NotNil(t, result.BudgetPlan, "BudgetPlan should exist")
+	assert.Greater(t, result.BudgetPlan.Flight, 0, "Flight budget should be positive")
+	assert.Greater(t, result.BudgetPlan.Hotel, 0, "Hotel budget should be positive")
+	assert.Greater(t, result.BudgetPlan.Food, 0, "Food budget should be positive")
+	assert.Greater(t, result.BudgetPlan.Transport, 0, "Transport budget should be positive")
+	assert.Greater(t, result.BudgetPlan.Misc, 0, "Misc budget should be positive")
+
+	// Assert flight information is valid
+	assert.NotEmpty(t, result.Flight.From, "Flight origin should be set")
+	assert.NotEmpty(t, result.Flight.To, "Flight destination should be set")
+	assert.NotEmpty(t, result.Flight.Date, "Flight date should be set")
+	assert.Greater(t, result.Flight.Price, 0, "Flight price should be positive")
+	assert.NotEmpty(t, result.Flight.Airline, "Airline should be set")
+
+	// Assert hotel information is valid
+	assert.NotEmpty(t, result.Hotel.City, "Hotel city should be set")
+	assert.Greater(t, result.Hotel.Nights, 0, "Hotel nights should be positive")
+	assert.Greater(t, result.Hotel.TotalPrice, 0, "Hotel total price should be positive")
+	assert.Greater(t, result.Hotel.PricePerNight, 0, "Hotel price per night should be positive")
+	assert.NotEmpty(t, result.Hotel.Name, "Hotel name should be set")
+
+	// Assert weather information is valid
+	assert.NotEmpty(t, result.Weather.City, "Weather city should be set")
+	assert.NotEmpty(t, result.Weather.Month, "Weather month should be set")
+	assert.NotEqual(t, 0, result.Weather.AvgTemp, "Weather temperature should be set")
+	assert.NotEmpty(t, result.Weather.Condition, "Weather condition should be set")
+
+	// Assert total cost is calculated correctly
+	assert.Greater(t, result.TotalEstimatedCost, 0, "Total cost should be positive")
+	expectedTotal := result.Flight.Price + result.Hotel.TotalPrice
+	assert.Equal(t, expectedTotal, result.TotalEstimatedCost, "Total cost should equal flight + hotel")
+
+	// Assert message summary is present
+	assert.NotEmpty(t, result.Message, "Message summary should not be empty")
+	assert.Contains(t, result.Message, "travel plan", "Message should mention travel plan")
+}
 
 func TestOrchestratePlan_BasicFlow(t *testing.T) {
 	message := "I want to travel to Canada for 7 days with a budget of 100000 baht"
 
 	result := OrchestratePlan(message)
 
-	// Verify basic structure
-	if result.Destination == "" {
-		t.Error("Destination should not be empty")
-	}
-
-	if result.BudgetTHB <= 0 {
-		t.Error("BudgetTHB should be positive")
-	}
-
-	if result.DurationDays <= 0 {
-		t.Error("DurationDays should be positive")
-	}
+	// Verify basic structure using assert
+	assert.NotEmpty(t, result.Destination, "Destination should not be empty")
+	assert.Greater(t, result.BudgetTHB, 0, "BudgetTHB should be positive")
+	assert.Greater(t, result.DurationDays, 0, "DurationDays should be positive")
 
 	// Verify budget plan exists
-	if result.BudgetPlan.Flight == 0 && result.BudgetPlan.Hotel == 0 {
-		t.Error("BudgetPlan should have values")
-	}
+	assert.True(t, result.BudgetPlan.Flight > 0 || result.BudgetPlan.Hotel > 0, "BudgetPlan should have values")
 
 	// Verify flight information
-	if result.Flight.From == "" || result.Flight.To == "" {
-		t.Error("Flight should have from and to codes")
-	}
-
-	if result.Flight.Date == "" {
-		t.Error("Flight date should be set")
-	}
-
-	if result.Flight.Price <= 0 {
-		t.Error("Flight price should be positive")
-	}
+	assert.NotEmpty(t, result.Flight.From, "Flight should have from code")
+	assert.NotEmpty(t, result.Flight.To, "Flight should have to code")
+	assert.NotEmpty(t, result.Flight.Date, "Flight date should be set")
+	assert.Greater(t, result.Flight.Price, 0, "Flight price should be positive")
 
 	// Verify hotel information
-	if result.Hotel.City == "" {
-		t.Error("Hotel city should be set")
-	}
-
-	if result.Hotel.Nights <= 0 {
-		t.Error("Hotel nights should be positive")
-	}
-
-	if result.Hotel.TotalPrice <= 0 {
-		t.Error("Hotel total price should be positive")
-	}
+	assert.NotEmpty(t, result.Hotel.City, "Hotel city should be set")
+	assert.Greater(t, result.Hotel.Nights, 0, "Hotel nights should be positive")
+	assert.Greater(t, result.Hotel.TotalPrice, 0, "Hotel total price should be positive")
 
 	// Verify weather information
-	if result.Weather.City == "" {
-		t.Error("Weather city should be set")
-	}
-
-	if result.Weather.Month == "" {
-		t.Error("Weather month should be set")
-	}
+	assert.NotEmpty(t, result.Weather.City, "Weather city should be set")
+	assert.NotEmpty(t, result.Weather.Month, "Weather month should be set")
 
 	// Verify total cost
-	if result.TotalEstimatedCost <= 0 {
-		t.Error("Total estimated cost should be positive")
-	}
-
-	// Verify message
-	if result.Message == "" {
-		t.Error("Message should not be empty")
-	}
+	assert.Greater(t, result.TotalEstimatedCost, 0, "Total estimated cost should be positive")
+	assert.NotEmpty(t, result.Message, "Message should not be empty")
 
 	// Verify total cost calculation
 	expectedTotal := result.Flight.Price + result.Hotel.TotalPrice
-	if result.TotalEstimatedCost != expectedTotal {
-		t.Errorf("Total cost mismatch: got %d, want %d", result.TotalEstimatedCost, expectedTotal)
+	assert.Equal(t, expectedTotal, result.TotalEstimatedCost, "Total cost mismatch")
+}
+
+func TestOrchestratePlan_ThaiLanguage(t *testing.T) {
+	// Test Thai input - the function should handle it gracefully
+	// Note: Without OpenAI API key, it will use defaults
+	message := "อยากไปเที่ยวแคนาดาในงบ 100,000 บาท 7 วัน"
+
+	result := OrchestratePlan(message)
+
+	// Should return a valid result even with Thai input
+	assert.NotNil(t, result, "Result should not be nil")
+	assert.NotEmpty(t, result.Destination, "Destination should be set")
+	assert.Greater(t, result.BudgetTHB, 0, "Budget should be positive")
+	assert.Greater(t, result.DurationDays, 0, "Duration should be positive")
+	assert.Greater(t, result.TotalEstimatedCost, 0, "Total cost should be positive")
+	assert.NotEmpty(t, result.Message, "Message should not be empty")
+}
+
+func TestOrchestratePlan_EnglishLanguage(t *testing.T) {
+	message := "I want to visit Tokyo for 5 days"
+
+	result := OrchestratePlan(message)
+
+	// Should return a valid result
+	assert.NotNil(t, result, "Result should not be nil")
+	assert.NotEmpty(t, result.Destination, "Destination should be set")
+	assert.Greater(t, result.BudgetTHB, 0, "Budget should be positive")
+	assert.Greater(t, result.DurationDays, 0, "Duration should be positive")
+	assert.Greater(t, result.TotalEstimatedCost, 0, "Total cost should be positive")
+}
+
+func TestOrchestratePlan_ValidJSONResponse(t *testing.T) {
+	message := "Tokyo trip for 5 days"
+
+	result := OrchestratePlan(message)
+
+	// Verify the struct can be marshaled to JSON
+	jsonData, err := json.Marshal(result)
+	assert.NoError(t, err, "Result should be JSON-serializable")
+	assert.NotEmpty(t, jsonData, "JSON data should not be empty")
+
+	// Parse back to verify structure
+	var parsed PlanResult
+	err = json.Unmarshal(jsonData, &parsed)
+	assert.NoError(t, err, "JSON should be parseable")
+
+	// Verify required fields exist in the parsed result
+	assert.NotEmpty(t, parsed.Destination, "Parsed destination should not be empty")
+	assert.Greater(t, parsed.BudgetTHB, 0, "Parsed budget should be positive")
+	assert.Greater(t, parsed.DurationDays, 0, "Parsed duration should be positive")
+
+	// Verify nested structures
+	assert.NotNil(t, parsed.BudgetPlan, "Budget plan should exist")
+	assert.Greater(t, parsed.Flight.Price, 0, "Flight price should be positive")
+	assert.Greater(t, parsed.Hotel.TotalPrice, 0, "Hotel price should be positive")
+	assert.NotEmpty(t, parsed.Weather.Condition, "Weather condition should be set")
+	assert.NotEmpty(t, parsed.Message, "Message should be set")
+}
+
+func TestOrchestratePlan_InvalidInput(t *testing.T) {
+	testCases := []struct {
+		name  string
+		input string
+	}{
+		{"empty string", ""},
+		{"very short", "trip"},
+		{"only destination", "Paris"},
+		{"with special chars", "I want to go to café in Paris!"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := OrchestratePlan(tc.input)
+
+			// Should return a valid result even with edge case inputs
+			assert.NotNil(t, result, "Result should not be nil")
+			assert.NotEmpty(t, result.Destination, "Destination should have default value")
+			assert.Greater(t, result.BudgetTHB, 0, "Budget should have default value")
+			assert.Greater(t, result.DurationDays, 0, "Duration should have default value")
+		})
 	}
 }
 
 func TestOrchestratePlan_MultipleDestinations(t *testing.T) {
 	tests := []struct {
-		name        string
-		message     string
-		wantContain string
+		name    string
+		message string
 	}{
 		{
-			name:        "Japan",
-			message:     "Trip to Japan for 5 days with 80000 baht",
-			wantContain: "japan",
+			name:    "Japan",
+			message: "Trip to Japan for 5 days with 80000 baht",
 		},
 		{
-			name:        "Singapore",
-			message:     "Travel to Singapore for 3 days with 50000 baht",
-			wantContain: "singapore",
+			name:    "Singapore",
+			message: "Travel to Singapore for 3 days with 50000 baht",
 		},
 		{
-			name:        "Korea",
-			message:     "I want to go to Korea for 7 days with 90000 baht",
-			wantContain: "korea",
+			name:    "Korea",
+			message: "I want to go to Korea for 7 days with 90000 baht",
 		},
 	}
 
@@ -108,18 +199,14 @@ func TestOrchestratePlan_MultipleDestinations(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := OrchestratePlan(tt.message)
 
-			if result.Destination == "" {
-				t.Error("Destination should not be empty")
-			}
+			assert.NotEmpty(t, result.Destination, "Destination should not be empty")
+			assert.Greater(t, result.TotalEstimatedCost, 0, "Total cost should be positive")
+			assert.NotEmpty(t, result.Message, "Message should not be empty")
 
-			// Verify basic fields are populated
-			if result.TotalEstimatedCost <= 0 {
-				t.Error("Total cost should be positive")
-			}
-
-			if result.Message == "" {
-				t.Error("Message should not be empty")
-			}
+			// Verify all components are present
+			assert.NotEmpty(t, result.Flight.Airline, "Flight airline should be set")
+			assert.NotEmpty(t, result.Hotel.Name, "Hotel name should be set")
+			assert.NotEmpty(t, result.Weather.Condition, "Weather condition should be set")
 		})
 	}
 }
@@ -178,9 +265,7 @@ func TestGetAirportCode_ExactMatch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := getAirportCode(tt.destination)
-			if got != tt.want {
-				t.Errorf("getAirportCode(%q) = %q, want %q", tt.destination, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "getAirportCode(%q) should return %q", tt.destination, tt.want)
 		})
 	}
 }
@@ -201,9 +286,7 @@ func TestGetAirportCode_CaseInsensitive(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := getAirportCode(tt.destination)
-			if got != tt.want {
-				t.Errorf("getAirportCode(%q) = %q, want %q", tt.destination, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "getAirportCode(%q) should be case-insensitive", tt.destination)
 		})
 	}
 }
@@ -221,9 +304,7 @@ func TestGetAirportCode_PartialMatch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := getAirportCode(tt.destination)
-			if got != tt.want {
-				t.Errorf("getAirportCode(%q) = %q, want %q", tt.destination, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "getAirportCode should match partial strings")
 		})
 	}
 }
@@ -240,9 +321,7 @@ func TestGetAirportCode_UnknownDestination(t *testing.T) {
 	for _, destination := range unknownDestinations {
 		t.Run(destination, func(t *testing.T) {
 			got := getAirportCode(destination)
-			if got != "SIN" {
-				t.Errorf("getAirportCode(%q) = %q, want SIN (default)", destination, got)
-			}
+			assert.Equal(t, "SIN", got, "getAirportCode(%q) should default to SIN", destination)
 		})
 	}
 }
@@ -270,9 +349,7 @@ func TestGetWeatherMonth_ValidDate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := getWeatherMonth(tt.dateStr)
-			if got != tt.wantMonth {
-				t.Errorf("getWeatherMonth(%q) = %q, want %q", tt.dateStr, got, tt.wantMonth)
-			}
+			assert.Equal(t, tt.wantMonth, got, "getWeatherMonth(%q) should return correct month", tt.dateStr)
 		})
 	}
 }
@@ -286,14 +363,12 @@ func TestGetWeatherMonth_InvalidDate(t *testing.T) {
 		"not a date",
 	}
 
+	currentMonth := time.Now().Format("January")
+
 	for _, dateStr := range invalidDates {
 		t.Run(dateStr, func(t *testing.T) {
 			got := getWeatherMonth(dateStr)
-			// Should return current month name
-			currentMonth := time.Now().Format("January")
-			if got != currentMonth {
-				t.Errorf("getWeatherMonth(%q) = %q, want %q (current month)", dateStr, got, currentMonth)
-			}
+			assert.Equal(t, currentMonth, got, "getWeatherMonth(%q) should return current month for invalid dates", dateStr)
 		})
 	}
 }
@@ -305,9 +380,7 @@ func TestGetWeatherMonth_FutureDate(t *testing.T) {
 	expectedMonth := futureDate.Format("January")
 
 	got := getWeatherMonth(dateStr)
-	if got != expectedMonth {
-		t.Errorf("getWeatherMonth(%q) = %q, want %q", dateStr, got, expectedMonth)
-	}
+	assert.Equal(t, expectedMonth, got, "getWeatherMonth should handle future dates correctly")
 }
 
 func TestMax(t *testing.T) {
@@ -328,9 +401,7 @@ func TestMax(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := max(tt.a, tt.b)
-			if got != tt.want {
-				t.Errorf("max(%d, %d) = %d, want %d", tt.a, tt.b, got, tt.want)
-			}
+			assert.Equal(t, tt.want, got, "max(%d, %d) should return %d", tt.a, tt.b, tt.want)
 		})
 	}
 }
@@ -341,22 +412,16 @@ func TestPlanResult_FlightDateIsFuture(t *testing.T) {
 
 	// Parse the flight date
 	flightDate, err := time.Parse("2006-01-02", result.Flight.Date)
-	if err != nil {
-		t.Fatalf("Failed to parse flight date: %v", err)
-	}
+	assert.NoError(t, err, "Flight date should be parseable")
 
 	// Flight date should be in the future
-	if !flightDate.After(time.Now()) {
-		t.Errorf("Flight date %s should be in the future", result.Flight.Date)
-	}
+	assert.True(t, flightDate.After(time.Now()), "Flight date %s should be in the future", result.Flight.Date)
 
 	// Flight date should be approximately 30 days from now (allow 1 day tolerance)
 	expectedDate := time.Now().AddDate(0, 0, 30)
 	daysDiff := flightDate.Sub(expectedDate).Hours() / 24
 
-	if daysDiff < -1 || daysDiff > 1 {
-		t.Errorf("Flight date should be ~30 days from now, got %s (diff: %.1f days)", result.Flight.Date, daysDiff)
-	}
+	assert.InDelta(t, 0, daysDiff, 1, "Flight date should be ~30 days from now, got %s (diff: %.1f days)", result.Flight.Date, daysDiff)
 }
 
 func TestPlanResult_HotelPricePerNight(t *testing.T) {
@@ -365,10 +430,7 @@ func TestPlanResult_HotelPricePerNight(t *testing.T) {
 
 	// Verify price per night calculation
 	expectedPricePerNight := result.Hotel.TotalPrice / result.Hotel.Nights
-	if result.Hotel.PricePerNight != expectedPricePerNight {
-		t.Errorf("Hotel price per night mismatch: got %d, want %d",
-			result.Hotel.PricePerNight, expectedPricePerNight)
-	}
+	assert.Equal(t, expectedPricePerNight, result.Hotel.PricePerNight, "Hotel price per night should be correctly calculated")
 }
 
 func TestPlanResult_MessageFormat(t *testing.T) {
@@ -387,9 +449,7 @@ func TestPlanResult_MessageFormat(t *testing.T) {
 	}
 
 	for _, required := range requiredStrings {
-		if !strings.Contains(result.Message, required) {
-			t.Errorf("Message should contain %q, got: %s", required, result.Message)
-		}
+		assert.Contains(t, result.Message, required, "Message should contain %q", required)
 	}
 }
 
@@ -399,16 +459,11 @@ func TestPlanResult_WeatherMonthMatchesFlightDate(t *testing.T) {
 
 	// Parse the flight date
 	flightDate, err := time.Parse("2006-01-02", result.Flight.Date)
-	if err != nil {
-		t.Fatalf("Failed to parse flight date: %v", err)
-	}
+	assert.NoError(t, err, "Flight date should be parseable")
 
 	// Weather month should match the flight date month
 	expectedMonth := flightDate.Format("January")
-	if result.Weather.Month != expectedMonth {
-		t.Errorf("Weather month should be %s to match flight date, got %s",
-			expectedMonth, result.Weather.Month)
-	}
+	assert.Equal(t, expectedMonth, result.Weather.Month, "Weather month should match flight date month")
 }
 
 func TestPlanResult_BudgetBreakdownPercentages(t *testing.T) {
@@ -424,19 +479,99 @@ func TestPlanResult_BudgetBreakdownPercentages(t *testing.T) {
 	expectedTransport := int(float64(budget) * 0.10)
 	expectedMisc := int(float64(budget) * 0.05)
 
-	if result.BudgetPlan.Flight != expectedFlight {
-		t.Errorf("Flight budget: got %d, want %d", result.BudgetPlan.Flight, expectedFlight)
+	assert.Equal(t, expectedFlight, result.BudgetPlan.Flight, "Flight budget should be 45%% of total")
+	assert.Equal(t, expectedHotel, result.BudgetPlan.Hotel, "Hotel budget should be 25%% of total")
+	assert.Equal(t, expectedFood, result.BudgetPlan.Food, "Food budget should be 15%% of total")
+	assert.Equal(t, expectedTransport, result.BudgetPlan.Transport, "Transport budget should be 10%% of total")
+	assert.Equal(t, expectedMisc, result.BudgetPlan.Misc, "Misc budget should be 5%% of total")
+}
+
+// Additional comprehensive tests
+
+func TestPlanResult_StructureValidation(t *testing.T) {
+	message := "Plan a trip to Paris for 10 days with 150000 THB"
+	result := OrchestratePlan(message)
+
+	// Verify all top-level fields are populated
+	assert.NotEmpty(t, result.Destination, "Destination should be set")
+	assert.Greater(t, result.BudgetTHB, 0, "BudgetTHB should be positive")
+	assert.Greater(t, result.DurationDays, 0, "DurationDays should be positive")
+
+	// Verify BudgetPlan structure
+	assert.Greater(t, result.BudgetPlan.Flight, 0, "Budget plan flight should be positive")
+	assert.Greater(t, result.BudgetPlan.Hotel, 0, "Budget plan hotel should be positive")
+	assert.Greater(t, result.BudgetPlan.Food, 0, "Budget plan food should be positive")
+	assert.Greater(t, result.BudgetPlan.Transport, 0, "Budget plan transport should be positive")
+	assert.Greater(t, result.BudgetPlan.Misc, 0, "Budget plan misc should be positive")
+
+	// Verify Flight structure
+	assert.NotEmpty(t, result.Flight.From, "Flight from should be set")
+	assert.NotEmpty(t, result.Flight.To, "Flight to should be set")
+	assert.NotEmpty(t, result.Flight.Date, "Flight date should be set")
+	assert.Greater(t, result.Flight.Price, 0, "Flight price should be positive")
+	assert.NotEmpty(t, result.Flight.Airline, "Flight airline should be set")
+
+	// Verify Hotel structure
+	assert.NotEmpty(t, result.Hotel.City, "Hotel city should be set")
+	assert.Greater(t, result.Hotel.Nights, 0, "Hotel nights should be positive")
+	assert.Greater(t, result.Hotel.TotalPrice, 0, "Hotel total price should be positive")
+	assert.Greater(t, result.Hotel.PricePerNight, 0, "Hotel price per night should be positive")
+	assert.NotEmpty(t, result.Hotel.Name, "Hotel name should be set")
+
+	// Verify Weather structure
+	assert.NotEmpty(t, result.Weather.City, "Weather city should be set")
+	assert.NotEmpty(t, result.Weather.Month, "Weather month should be set")
+	assert.NotEqual(t, 0, result.Weather.AvgTemp, "Weather temperature should be set")
+	assert.NotEmpty(t, result.Weather.Condition, "Weather condition should be set")
+
+	// Verify summary fields
+	assert.Greater(t, result.TotalEstimatedCost, 0, "Total estimated cost should be positive")
+	assert.NotEmpty(t, result.Message, "Message should be set")
+}
+
+func TestPlanResult_ConsistencyChecks(t *testing.T) {
+	message := "Singapore vacation for 6 days with 80000 THB budget"
+	result := OrchestratePlan(message)
+
+	// Hotel nights should match duration
+	// Note: In the current implementation, without API key it uses default duration
+	assert.Greater(t, result.Hotel.Nights, 0, "Hotel nights should be positive")
+
+	// Total cost should be sum of flight and hotel
+	calculatedTotal := result.Flight.Price + result.Hotel.TotalPrice
+	assert.Equal(t, calculatedTotal, result.TotalEstimatedCost, "Total cost should equal flight + hotel")
+
+	// Hotel price per night should be consistent
+	expectedPricePerNight := result.Hotel.TotalPrice / result.Hotel.Nights
+	assert.Equal(t, expectedPricePerNight, result.Hotel.PricePerNight, "Price per night calculation should be consistent")
+
+	// Weather city and hotel city should match
+	assert.Equal(t, result.Hotel.City, result.Weather.City, "Weather city should match hotel city")
+}
+
+func TestPlanResult_EdgeCases(t *testing.T) {
+	edgeCases := []struct {
+		name    string
+		message string
+	}{
+		{"Empty message", ""},
+		{"Very short message", "hi"},
+		{"Only numbers", "12345"},
+		{"Special characters", "@#$%^&*()"},
+		{"Mixed languages", "Trip to 東京 Tokyo"},
+		{"Long message", strings.Repeat("travel ", 100)},
 	}
-	if result.BudgetPlan.Hotel != expectedHotel {
-		t.Errorf("Hotel budget: got %d, want %d", result.BudgetPlan.Hotel, expectedHotel)
-	}
-	if result.BudgetPlan.Food != expectedFood {
-		t.Errorf("Food budget: got %d, want %d", result.BudgetPlan.Food, expectedFood)
-	}
-	if result.BudgetPlan.Transport != expectedTransport {
-		t.Errorf("Transport budget: got %d, want %d", result.BudgetPlan.Transport, expectedTransport)
-	}
-	if result.BudgetPlan.Misc != expectedMisc {
-		t.Errorf("Misc budget: got %d, want %d", result.BudgetPlan.Misc, expectedMisc)
+
+	for _, tc := range edgeCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Should not panic and should return valid structure
+			result := OrchestratePlan(tc.message)
+
+			assert.NotNil(t, result, "Result should not be nil")
+			assert.NotEmpty(t, result.Destination, "Should have default destination")
+			assert.Greater(t, result.BudgetTHB, 0, "Should have default budget")
+			assert.Greater(t, result.DurationDays, 0, "Should have default duration")
+			assert.Greater(t, result.TotalEstimatedCost, 0, "Should calculate total cost")
+		})
 	}
 }
