@@ -14,6 +14,7 @@ import (
 	"github.com/smithisrealdev/travel-ai-agent/backend/internal/config"
 	"github.com/smithisrealdev/travel-ai-agent/backend/internal/database"
 	"github.com/smithisrealdev/travel-ai-agent/backend/internal/handlers"
+	"github.com/smithisrealdev/travel-ai-agent/backend/internal/orchestrator"
 	"github.com/smithisrealdev/travel-ai-agent/backend/internal/services"
 )
 
@@ -43,6 +44,14 @@ func main() {
 	flightService := services.NewFlightService(cfg)
 	planService := services.NewPlanService(cfg)
 
+	// Initialize orchestrator
+	orch := orchestrator.New(
+		cfg.OpenAI.APIKey,
+		cfg.Weather.APIKey,
+		cfg.Flight.APIKey,
+		cfg.Hotel.APIKey,
+	)
+
 	// Initialize handlers
 	travelHandler := handlers.NewTravelHandler(
 		db,
@@ -51,7 +60,7 @@ func main() {
 		weatherService,
 		flightService,
 	)
-	planHandler := handlers.NewPlanHandler(planService)
+	planHandler := handlers.NewPlanHandler(planService, orch)
 
 	// Create Fiber app
 	app := fiber.New(fiber.Config{

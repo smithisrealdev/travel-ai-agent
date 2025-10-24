@@ -15,6 +15,7 @@ type Config struct {
 	OpenAI   OpenAIConfig
 	Weather  WeatherConfig
 	Flight   FlightConfig
+	Hotel    HotelConfig
 	JWT      JWTConfig
 	Env      EnvironmentConfig
 }
@@ -58,6 +59,12 @@ type WeatherConfig struct {
 
 // FlightConfig holds Flight API configuration
 type FlightConfig struct {
+	APIKey string
+	URL    string
+}
+
+// HotelConfig holds Hotel API configuration
+type HotelConfig struct {
 	APIKey string
 	URL    string
 }
@@ -112,6 +119,10 @@ func LoadConfig() (*Config, error) {
 		Flight: FlightConfig{
 			APIKey: getEnv("FLIGHT_API_KEY", ""),
 			URL:    getEnv("FLIGHT_API_URL", "https://api.aviationstack.com/v1"),
+		},
+		Hotel: HotelConfig{
+			APIKey: getEnv("HOTEL_API_KEY", ""),
+			URL:    getEnv("HOTEL_API_URL", "https://api.booking.com"),
 		},
 		JWT: JWTConfig{
 			Secret:    getEnv("JWT_SECRET", "default-secret-change-in-production"),
