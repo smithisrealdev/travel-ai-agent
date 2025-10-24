@@ -42,11 +42,11 @@ type TravelRecommendation struct {
 
 // WeatherInfo represents weather information for a destination
 type WeatherInfo struct {
-	Temperature float64 `json:"temperature"`
-	Description string  `json:"description"`
-	Humidity    int     `json:"humidity"`
-	WindSpeed   float64 `json:"windSpeed"`
-	Icon        string  `json:"icon"`
+	Temperature float64       `json:"temperature"`
+	Description string        `json:"description"`
+	Humidity    int           `json:"humidity"`
+	WindSpeed   float64       `json:"windSpeed"`
+	Icon        string        `json:"icon"`
 	Forecast    []DayForecast `json:"forecast,omitempty"`
 }
 
