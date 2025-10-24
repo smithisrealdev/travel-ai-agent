@@ -53,6 +53,7 @@ type PlanResult struct {
 // OrchestratePlan orchestrates all agents to create a complete travel plan
 // Parameters:
 //   - message: User's travel request (e.g., "I want to travel to Canada for 7 days with 100000 baht")
+//
 // Returns:
 //   - PlanResult: Complete travel plan with all details
 func OrchestratePlan(message string) PlanResult {
@@ -141,49 +142,49 @@ func getAirportCode(destination string) string {
 	destination = strings.ToLower(destination)
 
 	airportCodes := map[string]string{
-		"canada":        "YVR", // Vancouver
-		"vancouver":     "YVR",
-		"japan":         "NRT", // Tokyo Narita
-		"tokyo":         "NRT",
-		"korea":         "ICN", // Seoul Incheon
-		"seoul":         "ICN",
-		"singapore":     "SIN",
-		"hong kong":     "HKG",
-		"taipei":        "TPE",
-		"taiwan":        "TPE",
-		"malaysia":      "KUL", // Kuala Lumpur
-		"kuala lumpur":  "KUL",
-		"indonesia":     "CGK", // Jakarta
-		"jakarta":       "CGK",
-		"australia":     "SYD", // Sydney
-		"sydney":        "SYD",
-		"uk":            "LHR", // London
-		"london":        "LHR",
-		"england":       "LHR",
-		"france":        "CDG", // Paris
-		"paris":         "CDG",
-		"germany":       "FRA", // Frankfurt
-		"frankfurt":     "FRA",
-		"usa":           "LAX", // Los Angeles
-		"america":       "LAX",
-		"los angeles":   "LAX",
-		"new york":      "JFK",
-		"uae":           "DXB", // Dubai
-		"dubai":         "DXB",
-		"thailand":      "BKK", // Bangkok
-		"bangkok":       "BKK",
-		"phuket":        "HKT",
-		"chiang mai":    "CNX",
-		"vietnam":       "SGN", // Ho Chi Minh
-		"hanoi":         "HAN",
-		"ho chi minh":   "SGN",
-		"philippines":   "MNL", // Manila
-		"manila":        "MNL",
-		"india":         "DEL", // Delhi
-		"delhi":         "DEL",
-		"china":         "PEK", // Beijing
-		"beijing":       "PEK",
-		"shanghai":      "PVG",
+		"canada":       "YVR", // Vancouver
+		"vancouver":    "YVR",
+		"japan":        "NRT", // Tokyo Narita
+		"tokyo":        "NRT",
+		"korea":        "ICN", // Seoul Incheon
+		"seoul":        "ICN",
+		"singapore":    "SIN",
+		"hong kong":    "HKG",
+		"taipei":       "TPE",
+		"taiwan":       "TPE",
+		"malaysia":     "KUL", // Kuala Lumpur
+		"kuala lumpur": "KUL",
+		"indonesia":    "CGK", // Jakarta
+		"jakarta":      "CGK",
+		"australia":    "SYD", // Sydney
+		"sydney":       "SYD",
+		"uk":           "LHR", // London
+		"london":       "LHR",
+		"england":      "LHR",
+		"france":       "CDG", // Paris
+		"paris":        "CDG",
+		"germany":      "FRA", // Frankfurt
+		"frankfurt":    "FRA",
+		"usa":          "LAX", // Los Angeles
+		"america":      "LAX",
+		"los angeles":  "LAX",
+		"new york":     "JFK",
+		"uae":          "DXB", // Dubai
+		"dubai":        "DXB",
+		"thailand":     "BKK", // Bangkok
+		"bangkok":      "BKK",
+		"phuket":       "HKT",
+		"chiang mai":   "CNX",
+		"vietnam":      "SGN", // Ho Chi Minh
+		"hanoi":        "HAN",
+		"ho chi minh":  "SGN",
+		"philippines":  "MNL", // Manila
+		"manila":       "MNL",
+		"india":        "DEL", // Delhi
+		"delhi":        "DEL",
+		"china":        "PEK", // Beijing
+		"beijing":      "PEK",
+		"shanghai":     "PVG",
 	}
 
 	// Check exact match

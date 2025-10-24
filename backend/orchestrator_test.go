@@ -249,8 +249,8 @@ func TestGetAirportCode_UnknownDestination(t *testing.T) {
 
 func TestGetWeatherMonth_ValidDate(t *testing.T) {
 	tests := []struct {
-		name     string
-		dateStr  string
+		name      string
+		dateStr   string
 		wantMonth string
 	}{
 		{"January date", "2025-01-15", "January"},
