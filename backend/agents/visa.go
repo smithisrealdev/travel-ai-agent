@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/sashabaranov/go-openai"
 )
@@ -90,7 +89,29 @@ func (a *VisaDocAgent) CheckVisa(ctx context.Context, nationality, destination s
 
 // queryOpenAI uses OpenAI to get visa requirements
 func (a *VisaDocAgent) queryOpenAI(ctx context.Context, nationality, destination string, stayDays int, purpose string) (*VisaRequirement, error) {
-	prompt := fmt.Sprintf(`You are VisaDoc Agent, an expert in international visa requirements.\nProvide official-like but non-legal guidance.\n\nUser Query:\n- Nationality: %%s\n- Destination: %%s\n- Stay Duration: %%d days\n- Purpose: %%s\n\nReturn ONLY valid JSON with this exact structure:\n{\n  "visa_required": boolean,\n  "visa_type": "string or empty",\n  "checklist": [{"item":"string", "notes":"string"}],\n  "forms": [{"name":"string", "download_url":"string"}],\n  "processing_time": "string",\n  "fees": {"amount": number, "currency": "string"},\n  "validity": "string",\n  "max_stay_days": number,\n  "disclaimer": "This is not legal advice. Please verify with official government sources."\n}\n\nProvide accurate information. If uncertain, set visa_required to true and suggest manual verification.", 
+	prompt := fmt.Sprintf(`You are VisaDoc Agent, an expert in international visa requirements.
+Provide official-like but non-legal guidance.
+
+User Query:
+- Nationality: %s
+- Destination: %s
+- Stay Duration: %d days
+- Purpose: %s
+
+Return ONLY valid JSON with this exact structure:
+{
+  "visa_required": boolean,
+  "visa_type": "string or empty",
+  "checklist": [{"item":"string", "notes":"string"}],
+  "forms": [{"name":"string", "download_url":"string"}],
+  "processing_time": "string",
+  "fees": {"amount": number, "currency": "string"},
+  "validity": "string",
+  "max_stay_days": number,
+  "disclaimer": "This is not legal advice. Please verify with official government sources."
+}
+
+Provide accurate information. If uncertain, set visa_required to true and suggest manual verification.`,
 		nationality, destination, stayDays, purpose)
 
 	resp, err := a.client.CreateChatCompletion(
