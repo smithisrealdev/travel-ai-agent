@@ -31,6 +31,10 @@ build/
 *.so
 *.dylib
 
+# Nuxt build outputs
+.nuxt/
+.output/
+
 # Test coverage
 coverage/
 *.coverage
