@@ -4,24 +4,49 @@
 
 @layer base {
   body {
-    @apply bg-gray-50 text-gray-900;
+    @apply bg-background text-text font-inter;
   }
 }
 
 @layer components {
+  /* Buttons */
   .btn-primary {
-    @apply bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 shadow-md hover:shadow-lg;
+    @apply px-8 py-3 bg-primary text-white rounded-full font-poppins font-semibold hover:bg-blue-600 transition shadow-md hover:shadow-lg;
   }
 
   .btn-secondary {
-    @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-3 px-6 rounded-lg transition-colors duration-200;
+    @apply px-8 py-3 bg-white text-primary border-2 border-primary rounded-full font-poppins font-semibold hover:bg-blue-50 transition;
   }
 
-  .input-field {
-    @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200;
-  }
-
+  /* Cards */
   .card {
-    @apply bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow duration-200;
+    @apply bg-white rounded-3xl shadow-lg p-6 hover:shadow-xl transition-shadow duration-200;
+  }
+
+  /* Input Fields */
+  .input-field {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200;
+  }
+
+  /* Gradients */
+  .gradient-sky {
+    @apply bg-gradient-to-br from-blue-50 via-white to-amber-50;
+  }
+
+  .gradient-primary {
+    @apply bg-gradient-to-r from-primary to-blue-600;
+  }
+
+  /* Typography */
+  .heading-1 {
+    @apply text-5xl md:text-6xl font-poppins font-semibold text-gray-900;
+  }
+
+  .heading-2 {
+    @apply text-3xl md:text-4xl font-poppins font-semibold text-gray-900;
+  }
+
+  .body {
+    @apply text-base font-inter text-gray-600;
   }
 }
