@@ -8,18 +8,21 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/smithisrealdev/travel-ai-agent/backend/internal/models"
+	"github.com/smithisrealdev/travel-ai-agent/backend/internal/orchestrator"
 	"github.com/smithisrealdev/travel-ai-agent/backend/internal/services"
 )
 
 // PlanHandler handles travel plan-related HTTP requests
 type PlanHandler struct {
-	planService *services.PlanService
+	planService  *services.PlanService
+	orchestrator *orchestrator.Orchestrator
 }
 
 // NewPlanHandler creates a new plan handler instance
-func NewPlanHandler(planService *services.PlanService) *PlanHandler {
+func NewPlanHandler(planService *services.PlanService, orch *orchestrator.Orchestrator) *PlanHandler {
 	return &PlanHandler{
-		planService: planService,
+		planService:  planService,
+		orchestrator: orch,
 	}
 }
 
@@ -43,7 +46,30 @@ func (h *PlanHandler) CreateTravelPlan(c *fiber.Ctx) error {
 		})
 	}
 
-	// Check if plan service is initialized
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Use orchestrator if available, otherwise use plan service
+	if h.orchestrator != nil {
+		log.Printf("Using orchestrator to process message: %s", req.Message)
+		response, err := h.orchestrator.ProcessMessage(ctx, req.Message)
+		if err != nil {
+			log.Printf("Orchestrator error: %v", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
+				Error:   "AI service error",
+				Message: fmt.Sprintf("Failed to process request: %v", err),
+				Code:    fiber.StatusInternalServerError,
+			})
+		}
+
+		return c.JSON(fiber.Map{
+			"success":  true,
+			"response": response,
+		})
+	}
+
+	// Fallback to plan service
 	if h.planService == nil {
 		log.Println("Plan service not initialized")
 		return c.Status(fiber.StatusInternalServerError).JSON(models.ErrorResponse{
@@ -52,10 +78,6 @@ func (h *PlanHandler) CreateTravelPlan(c *fiber.Ctx) error {
 			Code:    fiber.StatusInternalServerError,
 		})
 	}
-
-	// Create context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
 
 	// Generate travel plan using OpenAI
 	log.Printf("Generating travel plan for message: %s", req.Message)
@@ -72,3 +94,4 @@ func (h *PlanHandler) CreateTravelPlan(c *fiber.Ctx) error {
 	// Return the plan response
 	return c.JSON(planResponse)
 }
+

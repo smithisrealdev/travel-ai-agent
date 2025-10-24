@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,9 +10,211 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/sashabaranov/go-openai"
 )
 
-// GetCheapestFlight searches for the cheapest flight between two cities
+// FlightStatus represents complete flight status information
+type FlightStatus struct {
+	FlightCode    string `json:"flight_code"`
+	Status        string `json:"status"`
+	DepartureTime string `json:"departure_time"`
+	ArrivalTime   string `json:"arrival_time"`
+	Gate          string `json:"gate"`
+	DelayMinutes  int    `json:"delay_minutes"`
+	Notification  string `json:"notification"`
+}
+
+// FlightAgent handles flight tracking and status checking
+type FlightAgent struct {
+	client *openai.Client
+	apiKey string
+}
+
+// NewFlightAgent creates a new flight agent
+func NewFlightAgent(openaiKey, flightKey string) *FlightAgent {
+	var client *openai.Client
+	if openaiKey != "" {
+		client = openai.NewClient(openaiKey)
+	}
+	return &FlightAgent{
+		client: client,
+		apiKey: flightKey,
+	}
+}
+
+// CheckFlight checks flight status and generates notifications
+func (a *FlightAgent) CheckFlight(ctx context.Context, flightCode string) (*FlightStatus, error) {
+	status := &FlightStatus{
+		FlightCode: flightCode,
+		Status:     "unknown",
+	}
+
+	// Try AviationStack API if available
+	if a.apiKey != "" {
+		apiStatus := a.fetchFlightStatusFromAPI(flightCode)
+		if apiStatus != nil {
+			status = apiStatus
+		}
+	}
+
+	// Fallback to mock data
+	if status.Status == "unknown" {
+		status = a.mockFlightStatus(flightCode)
+	}
+
+	// Generate notification if delayed
+	if status.DelayMinutes > 0 {
+		status.Notification = a.generateDelayNotification(ctx, status)
+	} else {
+		status.Notification = fmt.Sprintf("Flight %s is %s.", flightCode, status.Status)
+	}
+
+	log.Printf("FlightAgent: Checked %s - Status: %s, Delay: %d min", 
+		flightCode, status.Status, status.DelayMinutes)
+
+	return status, nil
+}
+
+// fetchFlightStatusFromAPI queries AviationStack API
+func (a *FlightAgent) fetchFlightStatusFromAPI(flightCode string) *FlightStatus {
+	url := fmt.Sprintf(
+		"https://api.aviationstack.com/v1/flights?access_key=%s&flight_iata=%s",
+		a.apiKey, flightCode,
+	)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		log.Printf("FlightAgent: API request failed: %v", err)
+		return nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		log.Printf("FlightAgent: API returned status %d", resp.StatusCode)
+		return nil
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("FlightAgent: Failed to read response: %v", err)
+		return nil
+	}
+
+	var result struct {
+		Data []struct {
+			FlightStatus string `json:"flight_status"`
+			Departure    struct {
+				Scheduled string `json:"scheduled"`
+				Actual    string `json:"actual"`
+				Gate      string `json:"gate"`
+				Delay     int    `json:"delay"`
+			} `json:"departure"`
+			Arrival struct {
+				Scheduled string `json:"scheduled"`
+				Actual    string `json:"actual"`
+			} `json:"arrival"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(body, &result); err != nil {
+		log.Printf("FlightAgent: Failed to parse response: %v", err)
+		return nil
+	}
+
+	if len(result.Data) == 0 {
+		return nil
+	}
+
+	flight := result.Data[0]
+	status := &FlightStatus{
+		FlightCode:    flightCode,
+		Status:        flight.FlightStatus,
+		DepartureTime: flight.Departure.Scheduled,
+		ArrivalTime:   flight.Arrival.Scheduled,
+		Gate:          flight.Departure.Gate,
+		DelayMinutes:  flight.Departure.Delay,
+	}
+
+	if flight.Departure.Delay > 0 {
+		status.Status = "delayed"
+	}
+
+	return status
+}
+
+// mockFlightStatus generates mock flight status for testing
+func (a *FlightAgent) mockFlightStatus(flightCode string) *FlightStatus {
+	// Simple mock - some flights are on time, some delayed
+	delayMinutes := 0
+	status := "on-time"
+	
+	// Hash-based pseudo-random delay
+	if len(flightCode) > 0 && flightCode[0] >= 'J' {
+		delayMinutes = 30
+		status = "delayed"
+	}
+
+	departureTime := time.Now().Add(2 * time.Hour).Format("2006-01-02 15:04")
+	arrivalTime := time.Now().Add(6 * time.Hour).Format("2006-01-02 15:04")
+
+	return &FlightStatus{
+		FlightCode:    flightCode,
+		Status:        status,
+		DepartureTime: departureTime,
+		ArrivalTime:   arrivalTime,
+		Gate:          "A12",
+		DelayMinutes:  delayMinutes,
+	}
+}
+
+// generateDelayNotification generates a polite delay notification
+func (a *FlightAgent) generateDelayNotification(ctx context.Context, status *FlightStatus) string {
+	if a.client == nil {
+		return fmt.Sprintf("Your flight %s is delayed by %d minutes. New departure time: %s. Please check the gate information.", 
+			status.FlightCode, status.DelayMinutes, status.DepartureTime)
+	}
+
+	prompt := fmt.Sprintf(`You are FlightAgent. Flight %s is delayed by %d minutes.
+Generate a polite, brief notification message for the passenger. Include:
+- Flight code
+- Delay duration
+- Apology
+- Brief advice`, status.FlightCode, status.DelayMinutes)
+
+	resp, err := a.client.CreateChatCompletion(
+		ctx,
+		openai.ChatCompletionRequest{
+			Model: "gpt-4o-mini",
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role:    openai.ChatMessageRoleSystem,
+					Content: "You are a professional airline notification system. Generate polite, brief delay notifications.",
+				},
+				{
+					Role:    openai.ChatMessageRoleUser,
+					Content: prompt,
+				},
+			},
+			Temperature: 0.7,
+			MaxTokens:   100,
+		},
+	)
+
+	if err != nil {
+		log.Printf("FlightAgent: Failed to generate notification: %v", err)
+		return fmt.Sprintf("Flight %s is delayed by %d minutes.", status.FlightCode, status.DelayMinutes)
+	}
+
+	if len(resp.Choices) > 0 {
+		return resp.Choices[0].Message.Content
+	}
+
+	return fmt.Sprintf("Flight %s is delayed by %d minutes.", status.FlightCode, status.DelayMinutes)
+}
+
+// GetCheapestFlight searches for the cheapest flight between two cities (Legacy function)
 // Parameters:
 //   - from: Origin airport/city code (e.g., "BKK" for Bangkok)
 //   - to: Destination airport/city code (e.g., "YVR" for Vancouver)

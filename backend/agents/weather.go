@@ -12,9 +12,254 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/sashabaranov/go-openai"
 )
 
-// GetWeatherSummary fetches weather information for a city in a specific month
+// DayForecast represents a single day's forecast
+type DayForecast struct {
+	Date        string  `json:"date"`
+	Temperature float64 `json:"temperature"`
+	Condition   string  `json:"condition"`
+	RainProb    float64 `json:"rain_probability"`
+}
+
+// WeatherForecast represents complete weather information with forecast
+type WeatherForecast struct {
+	City        string        `json:"city"`
+	Temperature float64       `json:"temperature"`
+	Condition   string        `json:"condition"`
+	RainProb    float64       `json:"rain_probability"`
+	Forecast    []DayForecast `json:"forecast"`
+	Suggestion  string        `json:"suggestion"`
+}
+
+// WeatherAgent handles weather forecasting and suggestions
+type WeatherAgent struct {
+	client *openai.Client
+	apiKey string
+}
+
+// NewWeatherAgent creates a new weather agent
+func NewWeatherAgent(openaiKey, weatherKey string) *WeatherAgent {
+	var client *openai.Client
+	if openaiKey != "" {
+		client = openai.NewClient(openaiKey)
+	}
+	return &WeatherAgent{
+		client: client,
+		apiKey: weatherKey,
+	}
+}
+
+// GetForecast gets 3-day weather forecast and suggestions
+func (a *WeatherAgent) GetForecast(ctx context.Context, city string) (*WeatherForecast, error) {
+	forecast := &WeatherForecast{
+		City:     city,
+		Forecast: make([]DayForecast, 0),
+	}
+
+	// Try to get forecast from OpenWeatherMap API
+	if a.apiKey != "" {
+		apiForecasts, avgRainProb := a.fetchForecastFromAPI(city)
+		if len(apiForecasts) > 0 {
+			forecast.Forecast = apiForecasts
+			forecast.RainProb = avgRainProb
+			if len(apiForecasts) > 0 {
+				forecast.Temperature = apiForecasts[0].Temperature
+				forecast.Condition = apiForecasts[0].Condition
+			}
+		}
+	}
+
+	// Fallback to estimated forecast
+	if len(forecast.Forecast) == 0 {
+		forecast.Forecast = a.estimateForecast(city)
+		forecast.RainProb = a.estimateRainProb(city)
+		if len(forecast.Forecast) > 0 {
+			forecast.Temperature = forecast.Forecast[0].Temperature
+			forecast.Condition = forecast.Forecast[0].Condition
+		}
+	}
+
+	// Generate suggestion if rain probability > 60%
+	if forecast.RainProb > 60 {
+		forecast.Suggestion = a.generateRainSuggestion(ctx, city, forecast.RainProb)
+	} else {
+		forecast.Suggestion = "Weather looks good for outdoor activities!"
+	}
+
+	log.Printf("WeatherAgent: Forecast for %s - Rain prob: %.1f%%, Suggestion: %s", 
+		city, forecast.RainProb, forecast.Suggestion)
+
+	return forecast, nil
+}
+
+// fetchForecastFromAPI gets forecast from OpenWeatherMap
+func (a *WeatherAgent) fetchForecastFromAPI(city string) ([]DayForecast, float64) {
+	url := fmt.Sprintf(
+		"https://api.openweathermap.org/data/2.5/forecast?q=%s&appid=%s&units=metric",
+		city, a.apiKey,
+	)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		log.Printf("WeatherAgent: API request failed: %v", err)
+		return nil, 0
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		log.Printf("WeatherAgent: API returned status %d", resp.StatusCode)
+		return nil, 0
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("WeatherAgent: Failed to read response: %v", err)
+		return nil, 0
+	}
+
+	var result struct {
+		List []struct {
+			Dt   int64 `json:"dt"`
+			Main struct {
+				Temp float64 `json:"temp"`
+			} `json:"main"`
+			Weather []struct {
+				Main string `json:"main"`
+			} `json:"weather"`
+			Pop float64 `json:"pop"` // Probability of precipitation
+		} `json:"list"`
+	}
+
+	if err := json.Unmarshal(body, &result); err != nil {
+		log.Printf("WeatherAgent: Failed to parse response: %v", err)
+		return nil, 0
+	}
+
+	// Group by day and get 3-day forecast
+	forecasts := make([]DayForecast, 0, 3)
+	rainProbs := make([]float64, 0)
+	seenDates := make(map[string]bool)
+
+	for _, item := range result.List {
+		date := time.Unix(item.Dt, 0).Format("2006-01-02")
+		
+		if !seenDates[date] && len(forecasts) < 3 {
+			condition := "Clear"
+			if len(item.Weather) > 0 {
+				condition = item.Weather[0].Main
+			}
+
+			forecasts = append(forecasts, DayForecast{
+				Date:        date,
+				Temperature: item.Main.Temp,
+				Condition:   condition,
+				RainProb:    item.Pop * 100,
+			})
+			rainProbs = append(rainProbs, item.Pop*100)
+			seenDates[date] = true
+		}
+	}
+
+	// Calculate average rain probability
+	avgRainProb := 0.0
+	if len(rainProbs) > 0 {
+		sum := 0.0
+		for _, prob := range rainProbs {
+			sum += prob
+		}
+		avgRainProb = sum / float64(len(rainProbs))
+	}
+
+	return forecasts, avgRainProb
+}
+
+// estimateForecast provides estimated 3-day forecast
+func (a *WeatherAgent) estimateForecast(city string) []DayForecast {
+	baseTemp := estimateTemperature(city, time.Now().Format("January"))
+	condition := estimateCondition(city, time.Now().Format("January"))
+
+	forecasts := make([]DayForecast, 3)
+	for i := 0; i < 3; i++ {
+		date := time.Now().AddDate(0, 0, i).Format("2006-01-02")
+		forecasts[i] = DayForecast{
+			Date:        date,
+			Temperature: float64(baseTemp + (i - 1)), // Slight variation
+			Condition:   condition,
+			RainProb:    a.estimateRainProb(city),
+		}
+	}
+
+	return forecasts
+}
+
+// estimateRainProb estimates rain probability for a city
+func (a *WeatherAgent) estimateRainProb(city string) float64 {
+	city = strings.ToLower(city)
+	month := strings.ToLower(time.Now().Format("January"))
+
+	rainyMonths := map[string][]string{
+		"vancouver":    {"november", "december", "january", "february", "march"},
+		"bangkok":      {"may", "june", "july", "august", "september", "october"},
+		"tokyo":        {"june", "july", "september"},
+		"singapore":    {"november", "december", "january"},
+		"kuala lumpur": {"april", "may", "october", "november"},
+	}
+
+	if months, ok := rainyMonths[city]; ok {
+		for _, m := range months {
+			if m == month {
+				return 75.0 // High rain probability
+			}
+		}
+	}
+
+	return 20.0 // Low rain probability
+}
+
+// generateRainSuggestion generates indoor activity suggestions
+func (a *WeatherAgent) generateRainSuggestion(ctx context.Context, city string, rainProb float64) string {
+	if a.client == nil {
+		return fmt.Sprintf("High chance of rain (%.0f%%). Consider indoor activities like museums, shopping malls, or indoor entertainment.", rainProb)
+	}
+
+	prompt := fmt.Sprintf(`You are WeatherAgent. There's a %.0f%% chance of rain in %s.
+Recommend 2-3 indoor activities suitable for rainy weather. Keep it brief and friendly.`, rainProb, city)
+
+	resp, err := a.client.CreateChatCompletion(
+		ctx,
+		openai.ChatCompletionRequest{
+			Model: "gpt-4o-mini",
+			Messages: []openai.ChatCompletionMessage{
+				{
+					Role:    openai.ChatMessageRoleSystem,
+					Content: "You are a helpful weather advisor. Provide brief, friendly indoor activity suggestions.",
+				},
+				{
+					Role:    openai.ChatMessageRoleUser,
+					Content: prompt,
+				},
+			},
+			Temperature: 0.7,
+			MaxTokens:   150,
+		},
+	)
+
+	if err != nil {
+		log.Printf("WeatherAgent: Failed to generate suggestion: %v", err)
+		return fmt.Sprintf("High chance of rain (%.0f%%). Consider indoor activities like museums, shopping malls, or indoor entertainment.", rainProb)
+	}
+
+	if len(resp.Choices) > 0 {
+		return resp.Choices[0].Message.Content
+	}
+
+	return fmt.Sprintf("High chance of rain (%.0f%%). Consider indoor activities.", rainProb)
+}
+
+// GetWeatherSummary fetches weather information for a city in a specific month (Legacy function)
 // Parameters:
 //   - city: City name (e.g., "Vancouver", "Tokyo")
 //   - month: Month name or number (e.g., "December", "12")
