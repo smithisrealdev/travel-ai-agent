@@ -7,9 +7,9 @@ services:
     container_name: travel-ai-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-traveldb}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-travelagent}
+      POSTGRES_USER: ${POSTGRES_USER:-travelagent}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your_secure_password_here}
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "5432:5432"
@@ -18,7 +18,7 @@ services:
     networks:
       - travel_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-travelagent}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -54,25 +54,39 @@ services:
       - .env
     environment:
       # Database Configuration
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      POSTGRES_DB: ${POSTGRES_DB:-traveldb}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_DB: ${POSTGRES_DB:-travelagent}
+      POSTGRES_USER: ${POSTGRES_USER:-travelagent}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-your_secure_password_here}
+      DATABASE_URL: ${DATABASE_URL}
+
       # Redis Configuration
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      
-      # API Keys (from .env)
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_URL: ${REDIS_URL}
+
+      # OpenAI Configuration
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+
+      # API Keys
       WEATHER_API_KEY: ${WEATHER_API_KEY}
+      WEATHER_API_URL: ${WEATHER_API_URL}
       FLIGHT_API_KEY: ${FLIGHT_API_KEY}
+      FLIGHT_API_URL: ${FLIGHT_API_URL}
       HOTEL_API_KEY: ${HOTEL_API_KEY}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
-      
+      HOTEL_API_URL: ${HOTEL_API_URL}
+
+      # JWT Configuration
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
+
       # Server Configuration
-      PORT: 8080
-      ENV: ${ENV:-development}
+      BACKEND_PORT: ${BACKEND_PORT:-8080}
+      BACKEND_HOST: ${BACKEND_HOST:-0.0.0.0}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      DEBUG: ${DEBUG:-true}
     depends_on:
       postgres:
         condition: service_healthy
@@ -97,7 +111,7 @@ services:
       # Backend API URL
       NUXT_PUBLIC_API_BASE_URL: ${NUXT_PUBLIC_API_BASE_URL:-http://backend:8080}
       BACKEND_URL: http://backend:8080
-      
+
       # Nuxt Configuration
       NODE_ENV: ${NODE_ENV:-development}
       HOST: 0.0.0.0
