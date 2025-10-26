@@ -10,6 +10,7 @@ AI-powered travel planning assistant MVP that helps you plan your perfect trip w
 - ✅ **Hotel recommendations** - Smart hotel suggestions based on your budget and preferences
 - ✅ **Weather forecasts** - Current weather and forecasts for your destination
 - ✅ **Budget breakdown** - Detailed cost analysis for flights, hotels, food, and activities
+- ✅ **Socially popular spots** - Top-rated places from Google Places sorted by review count
 - ✅ **Real-time chat interface** - Interactive conversation-based travel planning
 
 ## 🏗️ Architecture Overview
@@ -58,7 +59,12 @@ You'll need to obtain the following API keys:
    - Free tier available
    - Used for flight searches
 
-4. **Booking.com API Key** (Optional)
+4. **Google Places API Key** (Required for Social Features)
+   - Sign up at https://console.cloud.google.com/
+   - Enable Places API (New)
+   - Used for fetching socially popular spots
+
+5. **Booking.com API Key** (Optional)
    - Used for hotel recommendations
    - Falls back to generic recommendations if not provided
 
@@ -244,6 +250,55 @@ curl -X POST http://localhost:8080/api/plan \
 ```
 
 ### Additional Endpoints
+
+#### Social Places
+
+**POST** `/api/social`
+
+Fetches top-rated places from Google Places API sorted by review count. Returns socially popular spots that are integrated into AI agent responses.
+
+**Request:**
+```json
+{
+  "keyword": "restaurants",
+  "location": "Tokyo",
+  "limit": 10
+}
+```
+
+**Response:**
+```json
+{
+  "places": [
+    {
+      "placeId": "ChIJ...",
+      "name": "Sukiyabashi Jiro",
+      "address": "4 Chome-2-15 Ginza, Chuo City, Tokyo",
+      "rating": 4.8,
+      "reviewCount": 1250,
+      "priceLevel": 4,
+      "types": ["restaurant", "food"],
+      "photoUrl": "https://maps.googleapis.com/...",
+      "latitude": 35.6704,
+      "longitude": 139.7633,
+      "openNow": true
+    }
+  ],
+  "query": "restaurants in Tokyo",
+  "count": 10
+}
+```
+
+**Parameters:**
+- `keyword` (required): Type of place to search for (e.g., "restaurants", "tourist attractions", "cafes")
+- `location` (required): City or location name
+- `limit` (optional): Maximum number of results (default: 10)
+
+**Features:**
+- Results sorted by review count (highest first)
+- Cached for 1 hour for performance
+- Integrated into AI agent trip planning responses
+- Shown as "Socially Popular Spots" in travel plans
 
 #### Travel Search (v1)
 
@@ -493,7 +548,17 @@ docker compose exec redis redis-cli ping
 
 **Cost**: Free tier includes 100 requests/month
 
-### 4. Booking.com API Key (Optional)
+### 4. Google Places API Key (Required for Social Features)
+
+1. Go to https://console.cloud.google.com/
+2. Create a new project or select an existing one
+3. Enable the "Places API" (New)
+4. Go to "Credentials" and create an API key
+5. Add to `.env`: `GOOGLE_PLACES_API_KEY=...`
+
+**Cost**: Free tier includes $200 credit/month (~28,000 requests)
+
+### 5. Booking.com API Key (Optional)
 
 1. Apply for API access at https://www.booking.com/affiliate
 2. Wait for approval
