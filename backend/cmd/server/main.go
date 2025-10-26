@@ -52,6 +52,12 @@ func main() {
 		cfg.Flight.APIKey,
 		cfg.Hotel.APIKey,
 	)
+	
+	// Set social service if available
+	if socialService != nil {
+		adapter := orchestrator.NewSocialServiceAdapter(socialService)
+		orch.SetSocialService(adapter)
+	}
 
 	// Initialize handlers
 	travelHandler := handlers.NewTravelHandler(
