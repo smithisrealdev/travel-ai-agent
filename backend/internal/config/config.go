@@ -9,15 +9,16 @@ import (
 
 // Config holds all application configuration
 type Config struct {
-	Backend  BackendConfig
-	Database DatabaseConfig
-	Redis    RedisConfig
-	OpenAI   OpenAIConfig
-	Weather  WeatherConfig
-	Flight   FlightConfig
-	Hotel    HotelConfig
-	JWT      JWTConfig
-	Env      EnvironmentConfig
+	Backend      BackendConfig
+	Database     DatabaseConfig
+	Redis        RedisConfig
+	OpenAI       OpenAIConfig
+	Weather      WeatherConfig
+	Flight       FlightConfig
+	Hotel        HotelConfig
+	GooglePlaces GooglePlacesConfig
+	JWT          JWTConfig
+	Env          EnvironmentConfig
 }
 
 // BackendConfig holds backend server configuration
@@ -65,6 +66,12 @@ type FlightConfig struct {
 
 // HotelConfig holds Hotel API configuration
 type HotelConfig struct {
+	APIKey string
+	URL    string
+}
+
+// GooglePlacesConfig holds Google Places API configuration
+type GooglePlacesConfig struct {
 	APIKey string
 	URL    string
 }
@@ -123,6 +130,10 @@ func LoadConfig() (*Config, error) {
 		Hotel: HotelConfig{
 			APIKey: getEnv("HOTEL_API_KEY", ""),
 			URL:    getEnv("HOTEL_API_URL", "https://api.booking.com"),
+		},
+		GooglePlaces: GooglePlacesConfig{
+			APIKey: getEnv("GOOGLE_PLACES_API_KEY", ""),
+			URL:    getEnv("GOOGLE_PLACES_API_URL", "https://maps.googleapis.com/maps/api/place"),
 		},
 		JWT: JWTConfig{
 			Secret:    getEnv("JWT_SECRET", "default-secret-change-in-production"),

@@ -17,6 +17,19 @@ type Orchestrator struct {
 	flightAgent  *agents.FlightAgent
 	localAgent   *agents.LocalAgent
 	hotelAgent   *agents.HotelAgent
+	socialService interface {
+		GetTopRatedPlaces(keyword, location string, limit int) ([]SocialPlace, error)
+	}
+}
+
+// SocialPlace represents a socially popular place (imported from models)
+type SocialPlace struct {
+	PlaceID     string
+	Name        string
+	Address     string
+	Rating      float64
+	ReviewCount int
+	Types       []string
 }
 
 // New creates a new orchestrator with all agents
@@ -28,7 +41,15 @@ func New(openaiKey, weatherKey, flightKey, hotelKey string) *Orchestrator {
 		flightAgent:  agents.NewFlightAgent(openaiKey, flightKey),
 		localAgent:   agents.NewLocalAgent(openaiKey),
 		hotelAgent:   agents.NewHotelAgent(openaiKey, hotelKey),
+		socialService: nil, // Will be set via SetSocialService
 	}
+}
+
+// SetSocialService sets the social service for the orchestrator
+func (o *Orchestrator) SetSocialService(service interface {
+	GetTopRatedPlaces(keyword, location string, limit int) ([]SocialPlace, error)
+}) {
+	o.socialService = service
 }
 
 // ProcessMessage is the main entry point for handling user messages
@@ -135,6 +156,21 @@ func (o *Orchestrator) handlePlanTrip(ctx context.Context, intent *agents.Intent
 		}
 	}
 
+	// Get socially popular spots
+	if o.socialService != nil {
+		socialPlaces, err := o.socialService.GetTopRatedPlaces("tourist attractions", destination, 5)
+		if err == nil && len(socialPlaces) > 0 {
+			response += fmt.Sprintf("\n## Socially Popular Spots\n")
+			response += "*Top-rated places based on reviews*\n\n"
+			for i, place := range socialPlaces {
+				if i < 5 {
+					response += fmt.Sprintf("- **%s** (%.1f★, %d reviews)\n", 
+						place.Name, place.Rating, place.ReviewCount)
+				}
+			}
+		}
+	}
+
 	response += fmt.Sprintf("\n%s", plan.Summary)
 
 	return response, nil
@@ -229,6 +265,7 @@ func (o *Orchestrator) handleHotelSearch(ctx context.Context, intent *agents.Int
 // handleLocalRecommendation finds nearby places
 func (o *Orchestrator) handleLocalRecommendation(ctx context.Context, intent *agents.IntentResult) (string, error) {
 	interest := o.getStringEntity(intent.Entities, "interests", "restaurant")
+	destination := o.getStringEntity(intent.Entities, "destination", "")
 	
 	// Get location from entities
 	lat := 13.7563 // Default Bangkok
@@ -252,12 +289,27 @@ func (o *Orchestrator) handleLocalRecommendation(ctx context.Context, intent *ag
 
 	response := fmt.Sprintf("# Nearby %s Recommendations\n\n", strings.Title(interest))
 
+	// Add AI-generated recommendations
 	for i, place := range places {
 		response += fmt.Sprintf("%d. **%s**\n", i+1, place.Name)
 		response += fmt.Sprintf("   - Type: %s\n", place.Type)
 		response += fmt.Sprintf("   - Rating: %.1f★\n", place.Rating)
 		response += fmt.Sprintf("   - Distance: %.1f km away\n", place.DistanceKm)
 		response += fmt.Sprintf("   - Address: %s\n\n", place.Address)
+	}
+
+	// Add socially popular spots if available and destination is provided
+	if o.socialService != nil && destination != "" {
+		socialPlaces, err := o.socialService.GetTopRatedPlaces(interest, destination, 3)
+		if err == nil && len(socialPlaces) > 0 {
+			response += fmt.Sprintf("\n## Socially Popular %s in %s\n", strings.Title(interest), destination)
+			response += "*Top-rated by the community*\n\n"
+			for i, place := range socialPlaces {
+				response += fmt.Sprintf("%d. **%s** (%.1f★, %d reviews)\n", 
+					len(places)+i+1, place.Name, place.Rating, place.ReviewCount)
+				response += fmt.Sprintf("   - Address: %s\n\n", place.Address)
+			}
+		}
 	}
 
 	return response, nil
