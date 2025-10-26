@@ -43,6 +43,7 @@ func main() {
 	weatherService := services.NewWeatherService(cfg)
 	flightService := services.NewFlightService(cfg)
 	planService := services.NewPlanService(cfg)
+	socialService := services.NewSocialService(cfg)
 
 	// Initialize orchestrator
 	orch := orchestrator.New(
@@ -61,6 +62,7 @@ func main() {
 		flightService,
 	)
 	planHandler := handlers.NewPlanHandler(planService, orch)
+	socialHandler := handlers.NewSocialHandler(redis, socialService)
 
 	// Create Fiber app
 	app := fiber.New(fiber.Config{
@@ -86,6 +88,9 @@ func main() {
 
 	// Plan endpoint
 	api.Post("/plan", planHandler.CreateTravelPlan)
+
+	// Social places endpoint
+	api.Post("/social", socialHandler.GetSocialPlaces)
 
 	// API v1 Routes
 	apiv1 := app.Group("/api/v1")
