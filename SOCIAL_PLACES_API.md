@@ -95,7 +95,7 @@ When a user asks for local recommendations:
 
 ...
 
-## Socially Popular Cafe in Paris
+## Socially Popular Cafes in Paris
 *Top-rated by the community*
 
 4. **Angelina Paris** (4.7★, 8,432 reviews)
